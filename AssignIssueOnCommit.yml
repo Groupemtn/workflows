@@ -1,0 +1,41 @@
+name: Assign Issue on Commit
+
+on:
+  push:
+    branches:
+      - '**'  # Trigger on all branches
+
+jobs:
+  assign-issue:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get commit message
+        id: get_commit_message
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          echo "COMMIT_MESSAGE=${COMMIT_MESSAGE}" >> $GITHUB_ENV
+
+      - name: Extract issue ID and username
+        id: extract_info
+        run: |
+          # Adjust these regex patterns based on your commit message format
+          ISSUE_ID=$(echo "${COMMIT_MESSAGE}" | grep -oE '#[0-9]+' | tr -d '#')
+          USERNAME=$(echo "${COMMIT_MESSAGE}" | grep -oE '@[a-zA-Z0-9_-]+' | tr -d '@')
+
+          echo "ISSUE_ID=${ISSUE_ID}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+
+      - name: Assign issue
+        if: ${{ env.ISSUE_ID && env.USERNAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"assignees":["'"${USERNAME}"'"]}' \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ env.ISSUE_ID }}/assignees"
